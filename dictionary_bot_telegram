@@ -1,0 +1,82 @@
+from telegram.ext.updater import Updater
+from telegram.update import Update
+from telegram.ext.callbackcontext import CallbackContext
+from telegram.ext.commandhandler import CommandHandler
+from telegram.ext.messagehandler import MessageHandler
+from telegram.ext.filters import Filters
+import requests
+import json
+
+
+bot_token = "BOT_TOKEN"
+updater = Updater(bot_token, use_context=True)
+
+
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("""Hello sir, Welcome to the Hora_Pusa-server-manager-bot.
+    Please write
+    /help to see the commands available.""")
+
+
+def help(update: Update, context: CallbackContext):
+    update.message.reply_text("""Send Your word.""")
+
+
+def unknown_text(update: Update, context: CallbackContext):
+    update.message.reply_text(
+            "Sorry '%s' is not a valid command" % update.message.text)
+
+
+def unknown(update: Update, context: CallbackContext):
+    word_input = update.message.text
+
+    def get_word_info(word):
+        output = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}")
+        # output = output.text[1:]
+        # output = output[:-1]
+        output = json.loads(output.text)
+        return output
+
+    output = get_word_info(word_input)
+
+    word = output[0]["word"]
+    try:
+        part_of_speech = output[0]["meanings"][0]["partOfSpeech"]
+    except:
+        part_of_speech = None
+    try:
+        definition = output[0]["meanings"][0]["definitions"][0]["definition"]
+    except:
+        definition = None
+    audio_int = 0
+
+    try:
+        try:
+            while not "-us" in output[0]["phonetics"][audio_int]["audio"]:
+                audio_int += 1
+        except:
+            audio_int = 0
+        audio = output[0]["phonetics"][audio_int]["audio"]
+    except:
+        audio = None
+
+    word_info = f"""Word : {word}
+    
+Part of speech : {part_of_speech}
+
+Definition : {definition}"""
+
+    update.message.reply_text(word_info)
+    update.message.reply_audio(audio)
+
+
+updater.dispatcher.add_handler(CommandHandler('start', start))
+updater.dispatcher.add_handler(CommandHandler('help', help))
+updater.dispatcher.add_handler(MessageHandler(Filters.text, unknown))
+updater.dispatcher.add_handler(MessageHandler(
+    Filters.command, unknown))  # Filters out unknown commands
+
+# Filters out unknown messages.
+updater.dispatcher.add_handler(MessageHandler(Filters.text, unknown_text))
+
+updater.start_polling()
